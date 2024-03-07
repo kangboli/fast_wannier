@@ -1,5 +1,6 @@
 module oracles
     use, intrinsic :: iso_fortran_env, only : dp => real64
+    use expm
     implicit none
 
 
@@ -103,11 +104,13 @@ contains
 
         allocate(wsp(lwsp))
         allocate(ipiv(Ne))
+
         do k = 1, Nk
             call ZGPADM(ideg, Ne, t, DeltaU(:, :, k), Ne, wsp, lwsp, ipiv, iexp, ns, iflag)
             DeltaU(:, :, k) = reshape(wsp(iexp:iexp+Ne*Ne-1), shape(DeltaU(:, :, k)))
             call ZGEMM('N', 'N', Ne, Ne, Ne, alpha, U(:, :, k), Ne, DeltaU(:, :, k), Ne, beta, U(:, :, k), Ne)
         enddo
+
     end subroutine retract
 end module oracles
 

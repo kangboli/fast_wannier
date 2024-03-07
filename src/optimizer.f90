@@ -24,6 +24,7 @@ contains
         do while (grad_res > Nk * 1e-3)
             call omega_oracle(S, U, w, kplusb, Nk, Nb, Ne, omega, grad_omega)
             call project(grad_omega, Nk)
+            grad_omega = step_size * grad_omega
             call retract(U, grad_omega, Nk, Ne)
 
             grad_res = NORM2(abs(grad_omega))
