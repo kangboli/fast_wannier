@@ -32,15 +32,15 @@ This document describes the details of what we want to implement.
 The optimization problem can be written in abstract as 
 \begin{align}
         \min_{U}\; &  \Omega(U),\\
-        \Omega(U) = \sum_{n, b} w_b |1 - \hat{\rho}_n(b)|,& \quad \hat{\rho}_n(b) = \sum_k U^{k \dagger} S^{k, \mathrm{add}(k, b)} U^{\mathrm{add}(k, b)},\\
+        \Omega(U) = 2 \sum_{n, b} w_b (1 - |\hat{\rho}_n(b)|),& \quad \hat{\rho}_n(b) = \frac{1}{N_k}  \sum_k (U^{k \dagger} S^{k, b} U^{\mathrm{add}(k, b)})_{n,n},\\
         \mathrm{s.t}\; & U^{k \dagger} U^{k} = I,\\
-        U \in \mathbb{C}^{N_k \times N \times N},& S \in \mathbb{C}^{N_k \times N_b \times N \times N}, 
+        U \in \mathbb{C}^{N \times N \times N_k },& S \in \mathbb{C}^{N \times N \times N_b \times N_k}, 
         w \in \mathbb{R}^{N_b}\label{eq:dimensions}.
 \end{align}
 This is a constrained minimization problem, where the independent variable  is
 a complex tensor. The gradient of the objective function is 
 \begin{equation}
-    (\nabla \Omega(U))^k_{ij} = - \frac{4}{N}  \sum_{b, s} w_b \frac{\hat{\rho}_j^*(b)}{|\hat{\rho}_j(b)|} S_{i, s}^{k, \mathrm{add}(k, b)} U_{s, j}^{\mathrm{add}(k, b)}.
+    (\nabla \Omega(U))^k_{ij} = - \frac{4}{N_k}  \sum_{b, s} w_b \frac{\hat{\rho}_j^*(b)}{|\hat{\rho}_j(b)|} S_{i, s}^{k, b} U_{s, j}^{\mathrm{add}(k, b)}.
 \end{equation}
 The gist of the project is to make $\Omega$ and $\nabla \Omega$ fast. The
 $\mathrm{add}$ function is  a world of hurt, so we will just tabulate the

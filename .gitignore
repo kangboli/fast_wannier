@@ -1,3 +1,9 @@
 tex/main.*
 !tex/main.tex
 !tex/main.pdf
+**/*.o
+**/*.mod
+**/*.x
+**/*.a
+archive
+build
