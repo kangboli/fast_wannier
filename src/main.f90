@@ -11,7 +11,7 @@ program wannierise
     real(dp), allocatable :: w(:)
     integer, allocatable :: kplusb(:, :)
     complex(dp), allocatable :: grad_omega(:,:,:)
-    real(dp) :: omega
+    real(dp) :: omega(1)
     character(len=:), allocatable :: dirname
     dirname = "../si_data"
 
@@ -25,7 +25,7 @@ program wannierise
     ! call load_gauge(U, Nk, Ne, dirname)
     call id_gauge(U, Nk, Ne)
 
-    call omega_oracle(S, U, w, kplusb, Nk, Nb, Ne, omega, grad_omega)
+    ! call omega_oracle(S, U, w, kplusb, Nk, Nb, Ne, omega, grad_omega)
     call gradient_descent(S, U, w, kplusb, Nk, Nb, Ne)
 
     call unload_matrices(S, w, kplusb)

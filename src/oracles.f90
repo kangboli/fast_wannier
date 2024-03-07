@@ -5,82 +5,73 @@ module oracles
 
 
 contains
-    subroutine omega_oracle(S, U, w, kplusb, Nk, Nb, Ne, omega, grad_omega)
-        complex(dp), intent(in) :: S(:,:,:,:)
-        complex(dp), intent(in) :: U(:,:,:)
-        real(dp), intent(in) :: w(:)
-        integer, intent(in) :: kplusb(:,:)
-        integer, intent(in) :: Nk, Nb, Ne
-        real(dp), intent(out) :: omega
-        complex(dp) alpha, beta, theta
-        parameter ( alpha = 1, beta = 0, theta = 1)
-        complex(dp), allocatable :: M_work(:, :)
-        complex(dp), allocatable :: Mmn(:, :, :, :)
-        complex(dp), allocatable :: M_work_2(:, :)
-        complex(dp), allocatable :: S_work(:, :)
-        complex(dp), allocatable :: U_k(:, :)
-        complex(dp), allocatable :: U_kb(:, :)
 
-        complex(dp), allocatable :: rho_hat(:, :)
+    subroutine omega_oracle(S, U, w, kplusb, Nk, Nb, Ne, omega, grad_omega)
+        integer, intent(in) :: Nk, Nb, Ne
+        complex(dp), intent(in) :: S(Ne,Ne,Nk,Nb)
+        complex(dp), intent(in) :: U(Ne,Ne,Nk)
+        real(dp), intent(in) :: w(Nb)
+        integer, intent(in) :: kplusb(Nk,Nb)
+        real(dp), intent(out) :: omega(1)
+        complex(dp), intent(inout) :: grad_omega(Ne,Ne,Nk)
+        complex(dp) one, zero, theta
+        complex(dp) scalar
+        parameter ( one = 1, zero = 0, theta = 1)
+        complex(dp), allocatable :: M_work(:, :)
+        complex(dp), allocatable :: Rmn(:,:,:,:)
+
+        complex(dp), allocatable :: rho_hat(:,:)
         complex(dp), allocatable :: rho_hat_conj(:, :)
-        complex(dp), intent(inout) :: grad_omega(:,:,:)
         integer k, b, n, p, q
 
-        allocate(Mmn(Ne, Ne, Nk, Nb))
+        allocate(Rmn(Ne, Ne, Nk, Nb))
         allocate(M_work(Ne, Ne))
-        allocate(M_work_2(Ne, Ne))
         allocate(rho_hat(Ne, Nb))
         allocate(rho_hat_conj(Ne, Nb))
-        allocate(S_work(Ne, Ne))
-        allocate(U_k(Ne, Ne))
-        allocate(U_kb(Ne, Ne))
 
         ! Compute the objective function and the gradient in one go.
         ! This is the main code to optimize and parallelize. 
         ! The two ZGEMM should go on GPUs.
+        ! print *, "Hey!"
+        ! print *, S(1,1,1,1)
         omega = 0
-        Mmn = 0
+        grad_omega = 0
         do b = 1,Nb
             M_work = 0
 
             do k = 1,Nk
-                M_work_2 = 0
-                S_work(:, :) = S(:, :, k, b)
-                U_k(:, :) = U(:, :, k)
-                U_kb(:, :) = U(:, :, kplusb(k, b))
-                call ZGEMM('N', 'N', Ne, Ne, Ne, alpha, S_work, Ne, U_kb, Ne, beta, M_work_2, Ne)
-                ! call ZGEMM('C', 'N', Ne, Ne, Ne, alpha, U_k, Ne, M_work_2, Ne, theta, M_work, Ne)
-                call ZGEMM('C', 'N', Ne, Ne, Ne, alpha, U_k, Ne, M_work_2, Ne, theta, Mmn(:, :, k, b), Ne)
-                M_work(:, :) = M_work(:, :) + Mmn(:, :, k, b)
+                call ZGEMM('N', 'N', Ne, Ne, Ne, one, S(:, :, k, b), Ne, U(:, :, kplusb(k, b)), Ne, zero, Rmn(:, :, k, b), Ne)
+                call ZGEMM('C', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, Rmn(:, :, k, b), Ne, theta, M_work, Ne)
             enddo
 
             do n = 1, Ne
                 rho_hat(n, b) = M_work(n, n) / Nk
                 rho_hat_conj(n, b) = conjg(rho_hat(n, b)) / abs(rho_hat(n, b))
-                omega = omega + 2 * w(b) * (1 - abs(rho_hat(n, b)))
+                omega(1) = omega(1) + 2 * w(b) * (1 - abs(rho_hat(n, b)))
             enddo
 
             do k = 1,Nk
                 do q = 1, Ne
-                    grad_omega(:, q, k) = grad_omega(:, q, k) + w(b) * Mmn(:, q, k, b) * rho_hat_conj(q, b)
+                    scalar = rho_hat_conj(q, b) * w(b) 
+                    call ZAXPY(Ne, scalar, Rmn(:, q, k, b), 1, grad_omega(:, q, k), 1)
+                    ! grad_omega(:, q, k) = grad_omega(:, q, k) + Rmn(:, q, k, b) * rho_hat_conj(q, b) * w(b) 
                 enddo
             enddo
         enddo
 
-
         grad_omega = (-2.0 / Nk) * grad_omega
-
-        ! print *, omega
-        ! print *, grad_omega(:, :, 1)
-
     end subroutine 
 
-    subroutine project(grad_omega, Nk)
+    subroutine project(U, grad_omega, Nk, Ne)
+        complex(dp), intent(inout) :: U(:, :, :)
         complex(dp), intent(inout) :: grad_omega(:, :, :)
-        integer, intent(in) :: Nk
+        integer, intent(in) :: Nk, Ne
         integer :: k
+        complex(dp) alpha, beta, theta
+        parameter ( alpha = 1, beta = 0, theta = 1)
 
-        do k = 1, Nk
+        do k = 1,Nk
+            call ZGEMM('C', 'N', Ne, Ne, Ne, alpha, U(:, :, k), Ne, grad_omega(:, :, k), Ne, beta, grad_omega(:, :, k), Ne)
             grad_omega(:, :, k) = grad_omega(:, :, k) - CONJG(TRANSPOSE(grad_omega(:, :, k)))
         enddo
     end subroutine project
@@ -89,15 +80,13 @@ contains
         complex(dp), intent(inout) :: U(:, :, :)
         complex(dp), intent(inout) :: DeltaU(:, :, :)
         integer :: Nk, Ne
-        complex(dp) :: alpha, beta
         integer :: lwsp, ideg, iexp, iflag, ns
         integer, allocatable :: ipiv(:)
         complex(dp), allocatable :: wsp(:)
         real(dp) :: t
         integer :: r, k
-
-        alpha = 1.0
-        beta = 0.0
+        complex(dp) one, zero, theta
+        parameter ( one = 1, zero = 0, theta = 1)
         t = 1.0
         ideg = 6
         lwsp = 4 * Ne * Ne + ideg + 1
@@ -108,35 +97,9 @@ contains
         do k = 1, Nk
             call ZGPADM(ideg, Ne, t, DeltaU(:, :, k), Ne, wsp, lwsp, ipiv, iexp, ns, iflag)
             DeltaU(:, :, k) = reshape(wsp(iexp:iexp+Ne*Ne-1), shape(DeltaU(:, :, k)))
-            call ZGEMM('N', 'N', Ne, Ne, Ne, alpha, U(:, :, k), Ne, DeltaU(:, :, k), Ne, beta, U(:, :, k), Ne)
+            call ZGEMM('N', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, DeltaU(:, :, k), Ne, zero, U(:, :, k), Ne)
         enddo
 
     end subroutine retract
 end module oracles
 
-! do n = 1,Ne
-!     do k = 1,Nk
-!         do p = 1,Ne
-!             do q = 1,Ne
-!                 rho_hat(n, b) = rho_hat(n, b) + CONJG(U(p,n,k)) * S(p,q,k,b) * U(q,n,kplusb(k, b)) / Nk
-!             enddo
-!         enddo
-!     enddo
-! enddo
-
-
-
-! do b = 1, Nb
-!     M_work = 0
-!     do k = 1,Nk
-!         M_work_2 = 0
-!         S_work(:, :) = S(:, :, k, b)
-!         U_k(:, :) = U(:, :, k)
-!         U_kb(:, :) = U(:, :, kplusb(k, b))
-!         call ZGEMM('N', 'N', Ne, Ne, Ne, alpha, S_work, Ne, U_kb, Ne, beta, M_work_2, Ne)
-!         call ZGEMM('C', 'N', Ne, Ne, Ne, alpha, U_k, Ne, M_work_2, Ne, theta, M_work, Ne)
-!         do q = 1, Ne
-!             grad_omega(:, q, k) = grad_omega(:, q, k) + w(b) * M_work(:, q) * rho_hat_conj(q, b)
-!         enddo
-!     enddo
-! enddo
