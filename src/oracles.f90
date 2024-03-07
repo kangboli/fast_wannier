@@ -66,9 +66,6 @@ contains
             enddo
         enddo
 
-        do k = 1, Nk
-            grad_omega(:, :, k) = grad_omega(:, :, k) - CONJG(TRANSPOSE(grad_omega(:, :, k)))
-        enddo
 
         grad_omega = (-2.0 / Nk) * grad_omega
 
@@ -77,31 +74,66 @@ contains
 
     end subroutine 
 
+    subroutine project(grad_omega, Nk)
+        complex(dp), intent(inout) :: grad_omega(:, :, :)
+        integer, intent(in) :: Nk
+        integer :: k
+
+        do k = 1, Nk
+            grad_omega(:, :, k) = grad_omega(:, :, k) - CONJG(TRANSPOSE(grad_omega(:, :, k)))
+        enddo
+    end subroutine project
+
+    subroutine retract(U, DeltaU, Nk, Ne)
+        complex(dp), intent(inout) :: U(:, :, :)
+        complex(dp), intent(inout) :: DeltaU(:, :, :)
+        integer :: Nk, Ne
+        complex(dp) :: alpha, beta
+        integer :: lwsp, ideg, iexp, iflag, ns
+        integer, allocatable :: ipiv(:)
+        complex(dp), allocatable :: wsp(:)
+        real(dp) :: t
+        integer :: r, k
+
+        alpha = 1.0
+        beta = 0.0
+        t = 1.0
+        ideg = 6
+        lwsp = 4 * Ne * Ne + ideg + 1
+
+        allocate(wsp(lwsp))
+        allocate(ipiv(Ne))
+        do k = 1, Nk
+            call ZGPADM(ideg, Ne, t, DeltaU(:, :, k), Ne, wsp, lwsp, ipiv, iexp, ns, iflag)
+            DeltaU(:, :, k) = reshape(wsp(iexp:iexp+Ne*Ne-1), shape(DeltaU(:, :, k)))
+            call ZGEMM('N', 'N', Ne, Ne, Ne, alpha, U(:, :, k), Ne, DeltaU(:, :, k), Ne, beta, U(:, :, k), Ne)
+        enddo
+    end subroutine retract
 end module oracles
 
-            ! do n = 1,Ne
-            !     do k = 1,Nk
-            !         do p = 1,Ne
-            !             do q = 1,Ne
-            !                 rho_hat(n, b) = rho_hat(n, b) + CONJG(U(p,n,k)) * S(p,q,k,b) * U(q,n,kplusb(k, b)) / Nk
-            !             enddo
-            !         enddo
-            !     enddo
-            ! enddo
+! do n = 1,Ne
+!     do k = 1,Nk
+!         do p = 1,Ne
+!             do q = 1,Ne
+!                 rho_hat(n, b) = rho_hat(n, b) + CONJG(U(p,n,k)) * S(p,q,k,b) * U(q,n,kplusb(k, b)) / Nk
+!             enddo
+!         enddo
+!     enddo
+! enddo
 
 
-            
-        ! do b = 1, Nb
-        !     M_work = 0
-        !     do k = 1,Nk
-        !         M_work_2 = 0
-        !         S_work(:, :) = S(:, :, k, b)
-        !         U_k(:, :) = U(:, :, k)
-        !         U_kb(:, :) = U(:, :, kplusb(k, b))
-        !         call ZGEMM('N', 'N', Ne, Ne, Ne, alpha, S_work, Ne, U_kb, Ne, beta, M_work_2, Ne)
-        !         call ZGEMM('C', 'N', Ne, Ne, Ne, alpha, U_k, Ne, M_work_2, Ne, theta, M_work, Ne)
-        !         do q = 1, Ne
-        !             grad_omega(:, q, k) = grad_omega(:, q, k) + w(b) * M_work(:, q) * rho_hat_conj(q, b)
-        !         enddo
-        !     enddo
-        ! enddo
+
+! do b = 1, Nb
+!     M_work = 0
+!     do k = 1,Nk
+!         M_work_2 = 0
+!         S_work(:, :) = S(:, :, k, b)
+!         U_k(:, :) = U(:, :, k)
+!         U_kb(:, :) = U(:, :, kplusb(k, b))
+!         call ZGEMM('N', 'N', Ne, Ne, Ne, alpha, S_work, Ne, U_kb, Ne, beta, M_work_2, Ne)
+!         call ZGEMM('C', 'N', Ne, Ne, Ne, alpha, U_k, Ne, M_work_2, Ne, theta, M_work, Ne)
+!         do q = 1, Ne
+!             grad_omega(:, q, k) = grad_omega(:, q, k) + w(b) * M_work(:, q) * rho_hat_conj(q, b)
+!         enddo
+!     enddo
+! enddo
