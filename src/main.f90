@@ -1,6 +1,7 @@
 program wannierise
     use param_parser
     use oracles
+    use optimizer
     use, intrinsic :: iso_fortran_env, only : dp => real64
     implicit none
     integer Nk, Nb, Ne
@@ -21,10 +22,11 @@ program wannierise
     grad_omega = 0
 
     call load_matrices(S, w, kplusb, Nk, Nb, Ne, dirname) 
-    call load_gauge(U, Nk, Ne, dirname)
-    ! call id_gauge(U, Nk, Ne)
+    ! call load_gauge(U, Nk, Ne, dirname)
+    call id_gauge(U, Nk, Ne)
 
     call omega_oracle(S, U, w, kplusb, Nk, Nb, Ne, omega, grad_omega)
+    call gradient_descent(S, U, w, kplusb, Nk, Nb, Ne)
 
     call unload_matrices(S, w, kplusb)
     deallocate(U)
