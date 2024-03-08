@@ -12,15 +12,12 @@ program wannierise
     integer, allocatable :: kplusb(:, :)
     complex(dp), allocatable :: grad_omega(:,:,:)
     real(dp) :: omega(1)
-    character(len=:), allocatable :: dirname
+    character(:), allocatable :: dirname
     dirname = "../si_data"
 
     call load_dimensions(Nk, Nb, Ne, dirname) 
-
-    ! allocate(U(Ne, Ne, Nk))
     allocate(grad_omega(Ne, Ne, Nk))
     grad_omega = 0
-
     call load_matrices(S, w, kplusb, Nk, Nb, Ne, dirname) 
     ! call load_gauge(U, Nk, Ne, dirname)
     call id_gauge(U, Nk, Ne)

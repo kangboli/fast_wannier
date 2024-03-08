@@ -32,8 +32,6 @@ contains
         ! Compute the objective function and the gradient in one go.
         ! This is the main code to optimize and parallelize. 
         ! The two ZGEMM should go on GPUs.
-        ! print *, "Hey!"
-        ! print *, S(1,1,1,1)
         omega = 0
         grad_omega = 0
         do b = 1,Nb
@@ -41,7 +39,7 @@ contains
 
             do k = 1,Nk
                 call ZGEMM('N', 'N', Ne, Ne, Ne, one, S(:, :, k, b), Ne, U(:, :, kplusb(k, b)), Ne, zero, Rmn(:, :, k, b), Ne)
-                call ZGEMM('C', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, Rmn(:, :, k, b), Ne, theta, M_work, Ne)
+                call ZGEMM('C', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, Rmn(:, :, k, b), Ne, one, M_work, Ne)
             enddo
 
             do n = 1, Ne
@@ -60,26 +58,38 @@ contains
         enddo
 
         grad_omega = (-2.0 / Nk) * grad_omega
+
+        deallocate(Rmn)
+        deallocate(M_work)
+        deallocate(rho_hat)
+        deallocate(rho_hat_conj)
+
     end subroutine 
 
     subroutine project(U, grad_omega, Nk, Ne)
-        complex(dp), intent(inout) :: U(:, :, :)
-        complex(dp), intent(inout) :: grad_omega(:, :, :)
         integer, intent(in) :: Nk, Ne
+        complex(dp), intent(inout) :: U(Ne, Ne, Nk)
+        complex(dp), intent(inout) :: grad_omega(Ne, Ne, Nk)
+        complex(dp), allocatable :: grad_work(:, :)
         integer :: k
         complex(dp) alpha, beta, theta
         parameter ( alpha = 1, beta = 0, theta = 1)
+        allocate(grad_work(Ne, Ne))
 
         do k = 1,Nk
-            call ZGEMM('C', 'N', Ne, Ne, Ne, alpha, U(:, :, k), Ne, grad_omega(:, :, k), Ne, beta, grad_omega(:, :, k), Ne)
-            grad_omega(:, :, k) = grad_omega(:, :, k) - CONJG(TRANSPOSE(grad_omega(:, :, k)))
+            call ZGEMM('C', 'N', Ne, Ne, Ne, alpha, U(:, :, k), Ne, grad_omega(:, :, k), Ne, beta, grad_work, Ne)
+            grad_omega(:, :, k) = grad_work - CONJG(TRANSPOSE(grad_work))
+            ! grad_omega(:, :, k) = grad_omega(:, :, k) - CONJG(TRANSPOSE(grad_omega(:, :, k)))
         enddo
+
+        deallocate(grad_work)
     end subroutine project
 
     subroutine retract(U, DeltaU, Nk, Ne)
-        complex(dp), intent(inout) :: U(:, :, :)
-        complex(dp), intent(inout) :: DeltaU(:, :, :)
         integer :: Nk, Ne
+        complex(dp), intent(inout) :: U(Ne, Ne, Nk)
+        complex(dp), intent(inout) :: DeltaU(Ne, Ne, Nk)
+        complex(dp), allocatable :: U_work(:, :)
         integer :: lwsp, ideg, iexp, iflag, ns
         integer, allocatable :: ipiv(:)
         complex(dp), allocatable :: wsp(:)
@@ -93,12 +103,18 @@ contains
 
         allocate(wsp(lwsp))
         allocate(ipiv(Ne))
+        allocate(U_work(Ne, Ne))
 
         do k = 1, Nk
             call ZGPADM(ideg, Ne, t, DeltaU(:, :, k), Ne, wsp, lwsp, ipiv, iexp, ns, iflag)
             DeltaU(:, :, k) = reshape(wsp(iexp:iexp+Ne*Ne-1), shape(DeltaU(:, :, k)))
-            call ZGEMM('N', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, DeltaU(:, :, k), Ne, zero, U(:, :, k), Ne)
+            call ZGEMM('N', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, DeltaU(:, :, k), Ne, zero, U_work, Ne)
+            U(:, :, k) = U_work(:, :)
         enddo
+
+        deallocate(wsp)
+        deallocate(ipiv)
+        deallocate(U_work)
 
     end subroutine retract
 end module oracles
