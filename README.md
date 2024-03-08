@@ -1,9 +1,18 @@
 # Dev Guide
 
+## Style
+
+For the most part, just try to do what the Fortran best practices say, but
+there are a few things I need to suggest for practical reasons.
+
+- No global variable, even in a module. The plan is for the oracles functions
+  to be accessible from a higher level language such as Python and Julia. This
+  means that everything that a subroutine uses have to be passed as an
+  argument.
+    
 
 ## Shenanigans
 
-MKL's adds a `-fdefault-integer-8` to the build option, which crashes when
-reading from binary files with `integer 4` and vice versa. I decided to use
-`-fdefault-integer-8` because I don't know how to unset it when using MKL.
-
+In the `si_data`, integers are 64 bits. This works with Intel's toolchain but
+not so well with GNU. I tried `fdefault-integer-8`, but I had mixed results. We
+can stick with Intel or try to find a way to fix this.

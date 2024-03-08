@@ -19,7 +19,6 @@ contains
         parameter ( one = 1, zero = 0, theta = 1)
         complex(dp), allocatable :: M_work(:)
         complex(dp), allocatable :: Rmn(:,:,:,:)
-
         complex(dp), allocatable :: rho_hat(:,:)
         complex(dp), allocatable :: rho_hat_conj(:, :)
         integer k, b, n, p, q
@@ -27,7 +26,7 @@ contains
         allocate(Rmn(Ne, Ne, Nk, Nb))
         allocate(M_work(Ne))
         allocate(rho_hat(Ne, Nb))
-        allocate(rho_hat_conj(Ne, Nb))
+        ! allocate(rho_hat_conj(Ne, Nb))
 
         ! Compute the objective function and the gradient in one go.
         ! This is the main code to optimize and parallelize. 
@@ -49,13 +48,14 @@ contains
 
             do n = 1, Ne
                 rho_hat(n, b) = M_work(n) / Nk
-                rho_hat_conj(n, b) = conjg(rho_hat(n, b)) / abs(rho_hat(n, b))
                 omega(1) = omega(1) + 2 * w(b) * (1 - abs(rho_hat(n, b)))
+                ! rho_hat_conj(n, b) = conjg(rho_hat(n, b)) / abs(rho_hat(n, b))
+                rho_hat(n, b) = conjg(rho_hat(n, b)) / abs(rho_hat(n, b))
             enddo
 
             do k = 1,Nk
                 do q = 1, Ne
-                    scalar = rho_hat_conj(q, b) * w(b) 
+                    scalar = rho_hat(q, b) * w(b) 
                     call ZAXPY(Ne, scalar, Rmn(:, q, k, b), 1, grad_omega(:, q, k), 1)
                     ! grad_omega(:, q, k) = grad_omega(:, q, k) + Rmn(:, q, k, b) * rho_hat_conj(q, b) * w(b) 
                 enddo
@@ -67,7 +67,7 @@ contains
         deallocate(Rmn)
         deallocate(M_work)
         deallocate(rho_hat)
-        deallocate(rho_hat_conj)
+        ! deallocate(rho_hat_conj)
 
     end subroutine 
 
@@ -94,32 +94,36 @@ contains
         integer :: Nk, Ne
         complex(dp), intent(inout) :: U(Ne, Ne, Nk)
         complex(dp), intent(inout) :: DeltaU(Ne, Ne, Nk)
-        complex(dp), allocatable :: U_work(:, :)
-        integer :: lwsp, ideg, iexp, iflag, ns
+        integer :: size_u_work, ideg, iexp, iflag, ns
         integer, allocatable :: ipiv(:)
-        complex(dp), allocatable :: wsp(:)
+        complex(dp), allocatable :: U_work(:)
         real(dp) :: t
         integer :: r, k
-        complex(dp) one, zero, theta
-        parameter ( one = 1, zero = 0, theta = 1)
+        complex(dp) one, zero
+        parameter ( one = 1, zero = 0)
         t = 1.0
-        ideg = 6
-        lwsp = 4 * Ne * Ne + ideg + 1
+        ideg = 4
+        ! This is actually a lot of memory.
+        size_u_work = 4 * Ne * Ne + ideg + 1
 
-        allocate(wsp(lwsp))
+        allocate(U_work(size_u_work))
         allocate(ipiv(Ne))
-        allocate(U_work(Ne, Ne))
 
         do k = 1, Nk
-            call ZGPADM(ideg, Ne, t, DeltaU(:, :, k), Ne, wsp, lwsp, ipiv, iexp, ns, iflag)
-            DeltaU(:, :, k) = reshape(wsp(iexp:iexp+Ne*Ne-1), shape(DeltaU(:, :, k)))
-            call ZGEMM('N', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, DeltaU(:, :, k), Ne, zero, U_work, Ne)
-            U(:, :, k) = U_work(:, :)
+            ! U = U exp(delta U)
+            ! Compute the matrix exponential 
+            call ZGPADM(ideg, Ne, t, DeltaU(:, :, k), Ne, U_work, size_u_work, ipiv, iexp, ns, iflag)
+            DeltaU(:, :, k) = reshape(U_work(iexp:iexp+Ne*Ne-1), shape(DeltaU(:, :, k)))
+
+            ! Update the gauge.
+            call ZGEMM('N', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, DeltaU(:, :, k), Ne, zero, U_work(iexp:iexp+Ne*Ne-1), Ne)
+            U(:, :, k) = reshape(U_work(iexp:iexp+Ne*Ne-1), shape(U(:, :, k)))
+
+            ! call ZGEMM('N', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, DeltaU(:, :, k), Ne, zero, U_work, Ne)
         enddo
 
-        deallocate(wsp)
-        deallocate(ipiv)
         deallocate(U_work)
+        deallocate(ipiv)
 
     end subroutine retract
 end module oracles
