@@ -15,9 +15,9 @@ contains
         real(dp), intent(out) :: omega(1)
         complex(dp), intent(inout) :: grad_omega(Ne,Ne,Nk)
         complex(dp) one, zero, theta
-        complex(dp) scalar
+        complex(dp) scalar, dot
         parameter ( one = 1, zero = 0, theta = 1)
-        complex(dp), allocatable :: M_work(:, :)
+        complex(dp), allocatable :: M_work(:)
         complex(dp), allocatable :: Rmn(:,:,:,:)
 
         complex(dp), allocatable :: rho_hat(:,:)
@@ -25,7 +25,7 @@ contains
         integer k, b, n, p, q
 
         allocate(Rmn(Ne, Ne, Nk, Nb))
-        allocate(M_work(Ne, Ne))
+        allocate(M_work(Ne))
         allocate(rho_hat(Ne, Nb))
         allocate(rho_hat_conj(Ne, Nb))
 
@@ -39,11 +39,16 @@ contains
 
             do k = 1,Nk
                 call ZGEMM('N', 'N', Ne, Ne, Ne, one, S(:, :, k, b), Ne, U(:, :, kplusb(k, b)), Ne, zero, Rmn(:, :, k, b), Ne)
-                call ZGEMM('C', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, Rmn(:, :, k, b), Ne, one, M_work, Ne)
+                ! call ZGEMM('C', 'N', Ne, Ne, Ne, one, U(:, :, k), Ne, Rmn(:, :, k, b), Ne, one, M_work, Ne)
+                do n = 1, Ne
+                    dot = DOT_PRODUCT(U(:, n, k), Rmn(:, n, k, b))
+                    M_work(n) = M_work(n) + dot
+                enddo
+
             enddo
 
             do n = 1, Ne
-                rho_hat(n, b) = M_work(n, n) / Nk
+                rho_hat(n, b) = M_work(n) / Nk
                 rho_hat_conj(n, b) = conjg(rho_hat(n, b)) / abs(rho_hat(n, b))
                 omega(1) = omega(1) + 2 * w(b) * (1 - abs(rho_hat(n, b)))
             enddo
