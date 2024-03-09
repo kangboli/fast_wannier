@@ -13,6 +13,11 @@ there are a few things I need to suggest for practical reasons.
 
 ## Shenanigans
 
-In the `si_data`, integers are 64 bits. This works with Intel's toolchain but
-not so well with GNU. I tried `fdefault-integer-8`, but I had mixed results. We
-can stick with Intel or try to find a way to fix this.
+The data I included are Fortran binary files. The integers are saved as 64 bits
+and they have to match the default integer length of the compiler. `gfortran`'s
+default is 32 bits whereas `ifx`'s default is 32 bits.
+
+Fortran silently deallocates array whose intent is out. This prevents arrays
+from being allocated and deallocated in the same scope and paves the road to
+Helheim. For now, I'm using `load` for subroutines that can silently deallocate
+memory, but I don't know what is the right way to get around this.

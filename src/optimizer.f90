@@ -16,21 +16,23 @@ contains
         complex(dp), allocatable :: grad_omega(:,:,:)
         real(dp) :: grad_res, step_size
         complex(dp) alpha, beta, theta
-        integer :: k
+        integer :: k, n_iter
         parameter ( alpha = 1, beta = 0, theta = 1)
         step_size = -0.05
         allocate(grad_omega(Ne, Ne, Nk))
 
         grad_res = 1e6
 
-        do while (grad_res > Nk * 1e-6)
+        n_iter = 0
+        do while (grad_res > Nk * 1e-4)
             call omega_oracle(S, U, w, kplusb, Nk, Nb, Ne, omega, grad_omega)
             grad_omega = step_size * grad_omega
             call project(U, grad_omega, Nk, Ne)
             grad_res = NORM2(abs(grad_omega))
             call retract(U, grad_omega, Nk, Ne)
-            print *, grad_res
-            print *, omega
+            ! print *, grad_res
+            print *, n_iter, omega
+            n_iter = n_iter + 1
         enddo
 
     end subroutine

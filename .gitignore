@@ -7,3 +7,4 @@ tex/main.*
 **/*.a
 archive
 build
+.env
