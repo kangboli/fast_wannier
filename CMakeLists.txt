@@ -3,9 +3,9 @@ project(wannieroracles LANGUAGES Fortran)
 
 find_package(MKL)
 
-set(SRCS src/param_parser.f90 src/oracles.f90 src/optimizer.f90 src/zgpadm.f90)
+set(SRCS src/oracles.f90 src/zgpadm.f90)
 add_library(wannieroracles SHARED ${SRCS})
-add_executable(wannier.x src/main.f90 ${SRCS})
+add_executable(wannier.x src/main.f90 src/param_parser.f90 src/optimizer.f90 ${SRCS})
 
 if(${MKL_FOUND})
     

@@ -34,7 +34,7 @@ program wannierise
     ! This uses the identity gauge 
     call id_gauge(U, Nk, Ne)
 
-    ! call omega_oracle(S, U, w, kplusb, Nk, Nb, Ne, omega, grad_omega)
+    ! call omega_oracle(S, U, w, kplusb, Nk, Nb, Ne, omega, grad_omega, .false.)
     call gradient_descent(S, U, w, kplusb, Nk, Nb, Ne)
 
     call unload_matrices(S, w, kplusb)
