@@ -13,7 +13,7 @@ if(${MKL_FOUND})
   # COMMAND ${CMAKE_COMMAND} -E echo 
   # "MKL_COMPILE = $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>")
     target_link_libraries(wannier.x PRIVATE $<LINK_ONLY:MKL::MKL>)
-    target_compile_options(wannier.x PRIVATE $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+    target_compile_options(wannier.x PRIVATE $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS> -Wall)
     target_link_libraries(wannieroracles PRIVATE $<LINK_ONLY:MKL::MKL>)
 else()
     find_package(BLAS REQUIRED)

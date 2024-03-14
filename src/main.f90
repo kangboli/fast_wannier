@@ -11,7 +11,6 @@ program wannierise
     real(dp), allocatable :: w(:)
     integer, allocatable :: kplusb(:, :)
     complex(dp), allocatable :: grad_omega(:,:,:)
-    real(dp) :: omega(1)
     character(:), allocatable :: dirname
 
     integer :: num_args, ix

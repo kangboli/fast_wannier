@@ -20,7 +20,7 @@
 \newtheorem{theorem}{Theorem}
 \newtheorem{definition}{Definition}
 \title{\scshape Implementing the Truncated Density Convolution}
-\author{\normalsize Kangbo Li \& Jalen Harris}
+\author{\normalsize Kangbo Li}
 \date{\normalsize \today}
 \begin{document}
 \maketitle
@@ -28,15 +28,31 @@
 \section{Theory Overview}%
 \label{sec:Theory Overview}
 
+\subsection{The objective function}%
+\label{sub:The objective function}
+
 This document describes the details of what we want to implement. 
 The optimization problem can be written in abstract as 
 \begin{align}
-        \min_{U}\; &  \Omega(U),\\
+        &\min_{U}\;   \Omega(U),\\
+        \mathrm{s.t}\; & U^{k \dagger} U^{k} = I \in \mathbb{C}^{N_e \times N_e},\\
         \Omega(U) = 2 \sum_{n, b} w_b (1 - |\hat{\rho}_n(b)|),& \quad \hat{\rho}_n(b) = \frac{1}{N_k}  \sum_k (U^{k \dagger} S^{k, b} U^{\mathrm{add}(k, b)})_{n,n},\\
-        \mathrm{s.t}\; & U^{k \dagger} U^{k} = I,\\
-        U \in \mathbb{C}^{N \times N \times N_k },& S \in \mathbb{C}^{N \times N \times N_b \times N_k}, 
+        U \in \mathbb{C}^{N_j \times N_e \times N_k },& S \in \mathbb{C}^{N_j \times N_j \times N_k \times N_b }, 
         w \in \mathbb{R}^{N_b}\label{eq:dimensions}.
 \end{align}
+The variables represents 
+\begin{enumerate}
+    \item $N_k$: the number of $k$-points.
+    \item $N_b$: the number of $b$-vectors. 
+    \item $N_e$: the number of electrons per unit cell.
+    \item $N_j$: the number of bands to disentangle. $N_j = N_e$ for insulators.
+    \item $w_b$: the weights corresponding to each $b$ vector.
+    \item $U$: the gauge.
+    \item $S$: the overlap/transition matrices.
+    \item $\Omega$: the total spread.
+    \item $\hat{\rho}_n$: the Fourier transform of the density of the $n^{\mathrm{th}}$ electron.
+\end{enumerate}
+
 This is a constrained minimization problem, where the independent variable  is
 a complex tensor. The gradient of the objective function is 
 \begin{equation}
@@ -45,6 +61,10 @@ a complex tensor. The gradient of the objective function is
 The gist of the project is to make $\Omega$ and $\nabla \Omega$ fast. The
 $\mathrm{add}$ function is  a world of hurt, so we will just tabulate the
 result of the reference code and not worry about it.
+
+\subsection{Manifold Optimization}%
+\label{sub:Manifold Optimization}
+
 
 This constrained optimization problem is solved with a manifold conjugate
 gradient descent. The algorithm for a nonlinear conjugate gradient is roughly
@@ -78,23 +98,41 @@ that we are working on a manifold, which modifies the algorithm
     end
 \end{verbatim}
 \vspace{-0.5cm}
-The projection and the retraction implicitly used in Wannier90 are
+
+For the Stiefel manifold, the projection and retraction are
 \begin{align}
-    \mathrm{project}(X) &= (X - X^{\dagger}) / 2,\\
-    \mathrm{retract}(U, \Delta U) &= k \to U^k \exp(U^{k \dagger} \Delta U^k).
+    \mathrm{project}(C, X) &= X - C \left(\frac{C^{\dagger} X + X^{\dagger} C}{2} \right),\\
+    \mathrm{retract}(U, \Delta U) &= \mathrm{ortho}(U + \Delta U).
 \end{align}
-The purpose of the retraction is to enforce the constraint, so the exponential
-is unnecessarily expensive  and a QR of $U + \Delta U$ is likely fine.
+These formula can be simplified a bit in the special case of the orthogonal
+group, which corresponds to the insulators. The inefficient orthogonalization 
+that leads to the algorithm in the MLWF literature is the exponential map. The simplified 
+projection and the exponential map are
+\begin{align}
+    \mathrm{project}(U, X) &= U\left(\frac{ U^{\dagger} X -X^{\dagger} U }{2} \right),\\
+    \mathrm{retract}(U, \Delta U) &= U \exp(U^{\dagger} \Delta U).
+\end{align}
+To save some flops, one can move one of the $U$s from the projection to the
+retraction because the retraction step typically follows the projection in
+manifold optimization.
+\begin{align}
+	\mathrm{project}(U, X) &= (U^{\dagger} X - X^{\dagger} U) / 2,\\
+    \mathrm{retract}(U, \Delta U) &= U \exp(\Delta U).
+\end{align}
+In terms of computational cost, one ends up with two matrix multiplications and
+a matrix exponential. This is no cheaper than the Stiefel projection/retraction
+that we started with with the additional limitation to the orthogonal group.
+
 
 \section{Implementation Plan}%
 \label{sec:Implementation Plan}
 
 \begin{enumerate}
     \item (x) Prepare the parameters of the problem.
-    \item Read the parameters from Fortran.
-    \item Serial implementation of the objective function, the gradient, and
-        the retraction.
-    \item Implement a manifold optimization.
+    \item (x) Read the parameters from Fortran.
+    \item (x) Serial implementation of the objective function, the gradient, and the retraction.
+    \item (x) Implement a manifold optimization.
+    \item Implement disentanglement.
     \item Speedup.
 \end{enumerate}
 

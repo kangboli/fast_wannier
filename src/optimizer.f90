@@ -17,9 +17,10 @@ contains
         complex(dp), allocatable :: grad_work(:, :)
         complex(dp), allocatable :: Rmn(:,:,:,:)
         complex(dp), allocatable :: U_work(:)
+        complex(dp), allocatable :: rho_hat(:,:)
         real(dp) :: grad_res, step_size
         complex(dp) alpha, beta, theta
-        integer :: k, n_iter, ideg, size_u_work
+        integer :: n_iter, ideg, size_u_work, Nj
         parameter ( alpha = 1, beta = 0, theta = 1)
         step_size = -0.05
         ideg = 4
@@ -28,16 +29,17 @@ contains
         allocate(Rmn(Ne, Ne, Nk, Nb))
         allocate(grad_work(Ne, Ne))
         allocate(U_work(size_u_work))
+        allocate(rho_hat(Ne, Nb))
 
         grad_res = 1e6
 
         n_iter = 0
-        do while (grad_res > Nk * 1e-4)
-            call omega_oracle(S, Rmn, U, w, kplusb, Nk, Nb, Ne, omega, grad_omega, .false.)
-            grad_omega = step_size * grad_omega
+        do while (grad_res > REAL(Nk, 8) * 1e-4)
+            call f_oracle(S, Rmn, U, w, kplusb, rho_hat, Nk, Nb, Ne, Nj, omega)
+            call grad_f_oracle(Rmn, w, rho_hat, Nk, Nb, Ne, Nj, grad_omega)
             call project(U, grad_omega, grad_work, Nk, Ne)
             grad_res = NORM2(abs(grad_omega))
-            call retract(U, grad_omega, U_work, Nk, Ne, ideg, size_u_work)
+            call retract(U, grad_omega, U_work, Nk, Ne, ideg, size_u_work, step_size)
             print *, n_iter, omega
             n_iter = n_iter + 1
         enddo
