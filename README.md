@@ -1,4 +1,4 @@
-# A Fortran Implementation of the Truncated Density Convolution.
+# A Fortran Implementation of the Truncated Density Convolution
 
 ## Build and Run
 
