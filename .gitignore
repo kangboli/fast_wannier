@@ -8,3 +8,5 @@ tex/main.*
 archive
 build
 .env
+.idea
+.DS_Store

@@ -19,7 +19,7 @@ else()
     find_package(BLAS REQUIRED)
     find_package(LAPACK REQUIRED)
     target_link_libraries(wannier.x PRIVATE ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
-    target_compile_options(wannier.x PRIVATE -Wall -pedantic -march=native)
+    target_compile_options(wannier.x PRIVATE -Wall -pedantic -march=native -fdefault-integer-8)
     target_link_libraries(wannieroracles PRIVATE ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 endif()
 
